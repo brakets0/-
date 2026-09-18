@@ -1,0 +1,35 @@
+"""员工/管理员账号表。"""
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+USER_ROLES = ("employee", "department_manager", "general_admin")
+USER_STATUSES = ("active", "inactive")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    role: Mapped[str] = mapped_column(
+        Enum(*USER_ROLES, name="user_role"), nullable=False
+    )
+    department_id: Mapped[int | None] = mapped_column(
+        ForeignKey("departments.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default="active", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    department = relationship("Department", back_populates="employees")
+
