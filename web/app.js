@@ -23,6 +23,314 @@ function escapeAttr(value) {
     return escapeHtml(value);
 }
 
+function openSelectPanel(select) {
+    if (select.dataset.panelOpen === "1") {
+        return;
+    }
+    select.dataset.panelOpen = "1";
+    const wrap = document.createElement("div");
+    wrap.className = "select-pop-wrap";
+    wrap.style.minWidth = `${Math.max(select.offsetWidth, 180)}px`;
+    wrap.innerHTML = `
+        <div class="select-pop glass" role="listbox" tabindex="-1"></div>
+    `;
+    const list = wrap.querySelector(".select-pop");
+    list.addEventListener("mousedown", (event) => event.preventDefault());
+    Array.from(select.options).forEach((option, index) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "select-pop-item" + (option.selected ? " active" : "");
+        item.textContent = option.textContent || option.value;
+        item.addEventListener("click", () => {
+            select.selectedIndex = index;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            closeSelectPanel(select);
+        });
+        list.appendChild(item);
+    });
+    select.insertAdjacentElement("afterend", wrap);
+    const rect = select.getBoundingClientRect();
+    wrap.style.top = `${rect.bottom + 6}px`;
+    wrap.style.left = `${rect.left}px`;
+    const dismiss = (event) => {
+        if (!wrap.contains(event.target) && event.target !== select) {
+            closeSelectPanel(select);
+        }
+    };
+    const onKey = (event) => {
+        if (event.key === "Escape") {
+            closeSelectPanel(select);
+        }
+    };
+    const abort = new AbortController();
+    select._panelAbort = abort;
+    document.addEventListener("click", dismiss, { capture: true, signal: abort.signal });
+    document.addEventListener("keydown", onKey, { capture: true, signal: abort.signal });
+    document.addEventListener("scroll", dismiss, { capture: true, signal: abort.signal });
+    window.addEventListener("resize", () => closeSelectPanel(select), { signal: abort.signal });
+    list.focus();
+}
+
+function closeSelectPanel(select) {
+    if (select.dataset.panelOpen !== "1") return;
+    const wrap = select.nextElementSibling;
+    if (wrap?.classList.contains("select-pop-wrap")) {
+        wrap.remove();
+    }
+    select._panelAbort?.abort();
+    select._panelAbort = null;
+    select.dataset.panelOpen = "0";
+}
+
+function openDatePanel(input) {
+    if (input.dataset.panelOpen === "1") {
+        return;
+    }
+    input.dataset.panelOpen = "1";
+    const wrap = document.createElement("div");
+    wrap.className = "select-pop-wrap date-pop-wrap";
+    wrap.innerHTML = `
+        <div class="select-pop date-pop glass" tabindex="-1">
+            <div class="date-pop-header"></div>
+            <div class="date-pop-grid"></div>
+        </div>
+    `;
+    const pop = wrap.querySelector(".date-pop");
+    const header = wrap.querySelector(".date-pop-header");
+    const grid = wrap.querySelector(".date-pop-grid");
+    const yearNow = new Date().getFullYear();
+    const monthNow = new Date().getMonth();
+    let viewYear = yearNow;
+    let viewMonth = monthNow;
+    const pick = (iso) => {
+        input.value = iso;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        closeSelectPanel(input);
+    };
+    const onClick = (event) => {
+        if (event.target.closest("[data-action='today']")) {
+            const today = new Date();
+            viewYear = today.getFullYear();
+            viewMonth = today.getMonth();
+            pick(today.toISOString().slice(0, 10));
+        } else if (event.target.closest("[data-action='prev']")) {
+            viewMonth -= 1;
+            if (viewMonth < 0) {
+                viewMonth = 11;
+                viewYear -= 1;
+            }
+            render();
+        } else if (event.target.closest("[data-action='next']")) {
+            viewMonth += 1;
+            if (viewMonth > 11) {
+                viewMonth = 0;
+                viewYear += 1;
+            }
+            render();
+        } else {
+            const day = event.target.closest("[data-day]");
+            if (day) {
+                const iso = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(Number(day.dataset.day)).padStart(2, "0")}`;
+                pick(iso);
+            }
+        }
+    };
+    const render = () => {
+        header.innerHTML = `
+            <button type="button" class="date-pop-nav" data-action="prev" aria-label="上个月">‹</button>
+            <span>${viewYear}年 ${viewMonth + 1}月</span>
+            <button type="button" class="date-pop-nav" data-action="next" aria-label="下个月">›</button>
+            <button type="button" class="date-pop-today" data-action="today">今天</button>
+        `;
+        grid.innerHTML = "";
+        grid.innerHTML = ["日", "一", "二", "三", "四", "五", "六"]
+            .map((day) => `<span class="date-pop-week">${day}</span>`)
+            .join("");
+        const first = new Date(viewYear, viewMonth, 1);
+        const startOffset = first.getDay();
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        for (let i = 0; i < startOffset; i += 1) {
+            grid.insertAdjacentHTML("beforeend", '<span class="date-pop-empty"></span>');
+        }
+        const selectedIso = input.value || "";
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            const iso = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const classes = ["date-pop-day"];
+            if (iso === selectedIso) classes.push("active");
+            if (iso === new Date().toISOString().slice(0, 10)) classes.push("today");
+            grid.insertAdjacentHTML("beforeend", `<button type="button" class="${classes.join(" ")}" data-day="${day}">${day}</button>`);
+        }
+    };
+    render();
+    pop.addEventListener("mousedown", (event) => event.preventDefault());
+    pop.addEventListener("click", onClick);
+    input.insertAdjacentElement("afterend", wrap);
+    const rect = input.getBoundingClientRect();
+    wrap.style.top = `${rect.bottom + 6}px`;
+    wrap.style.left = `${rect.left}px`;
+    const dismiss = (event) => {
+        if (!wrap.contains(event.target) && event.target !== input) {
+            closeSelectPanel(input);
+        }
+    };
+    const onKey = (event) => {
+        if (event.key === "Escape") {
+            closeSelectPanel(input);
+        }
+    };
+    const abort = new AbortController();
+    input._panelAbort = abort;
+    document.addEventListener("click", dismiss, { capture: true, signal: abort.signal });
+    document.addEventListener("keydown", onKey, { capture: true, signal: abort.signal });
+    document.addEventListener("scroll", dismiss, { capture: true, signal: abort.signal });
+    window.addEventListener("resize", () => closeSelectPanel(input), { signal: abort.signal });
+}
+
+function openTimePanel(input) {
+    if (input.dataset.panelOpen === "1") {
+        return;
+    }
+    input.dataset.panelOpen = "1";
+    const now = new Date();
+    let hour = now.getHours();
+    let minute = now.getMinutes();
+    if (input.value) {
+        const [rawHour, rawMinute] = input.value.split(":").map(Number);
+        if (Number.isInteger(rawHour) && Number.isInteger(rawMinute)) {
+            hour = rawHour;
+            minute = rawMinute;
+        }
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "select-pop-wrap time-pop-wrap";
+    wrap.innerHTML = `
+        <div class="select-pop time-pop glass" tabindex="-1">
+            <div class="time-pop-header">
+                <button type="button" class="date-pop-today" data-action="now">现在</button>
+            </div>
+            <div class="time-pop-cols">
+                <div class="time-pop-col">
+                    <span class="time-pop-label">小时</span>
+                    <div class="time-pop-grid" data-part="hours"></div>
+                </div>
+                <div class="time-pop-col">
+                    <span class="time-pop-label">分钟</span>
+                    <div class="time-pop-grid" data-part="minutes"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    const pop = wrap.querySelector(".time-pop");
+    const hoursGrid = wrap.querySelector("[data-part='hours']");
+    const minutesGrid = wrap.querySelector("[data-part='minutes']");
+    const pick = () => {
+        const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        closeSelectPanel(input);
+    };
+    const render = () => {
+        const selectedHour = String(hour).padStart(2, "0");
+        const selectedMinute = String(minute).padStart(2, "0");
+        hoursGrid.innerHTML = Array.from({ length: 24 }, (_, i) => {
+            const label = String(i).padStart(2, "0");
+            const active = label === selectedHour ? " active" : "";
+            return `<button type="button" class="time-pop-cell${active}" data-hour="${i}">${label}</button>`;
+        }).join("");
+        minutesGrid.innerHTML = Array.from({ length: 12 }, (_, i) => {
+            const label = String(i * 5).padStart(2, "0");
+            const active = label === selectedMinute ? " active" : "";
+            return `<button type="button" class="time-pop-cell${active}" data-minute="${i * 5}">${label}</button>`;
+        }).join("");
+    };
+    const onClick = (event) => {
+        const nowBtn = event.target.closest("[data-action='now']");
+        if (nowBtn) {
+            const today = new Date();
+            hour = today.getHours();
+            minute = Math.floor(today.getMinutes() / 5) * 5;
+            render();
+            return;
+        }
+        const hourCell = event.target.closest("[data-hour]");
+        if (hourCell) {
+            hour = Number(hourCell.dataset.hour);
+            render();
+            return;
+        }
+        const minuteCell = event.target.closest("[data-minute]");
+        if (minuteCell) {
+            minute = Number(minuteCell.dataset.minute);
+            pick();
+        }
+    };
+    render();
+    pop.addEventListener("mousedown", (event) => event.preventDefault());
+    pop.addEventListener("click", onClick);
+    input.insertAdjacentElement("afterend", wrap);
+    const rect = input.getBoundingClientRect();
+    wrap.style.top = `${rect.bottom + 6}px`;
+    wrap.style.left = `${rect.left}px`;
+    const dismiss = (event) => {
+        if (!wrap.contains(event.target) && event.target !== input) {
+            closeSelectPanel(input);
+        }
+    };
+    const onKey = (event) => {
+        if (event.key === "Escape") {
+            closeSelectPanel(input);
+        }
+    };
+    const abort = new AbortController();
+    input._panelAbort = abort;
+    document.addEventListener("click", dismiss, { capture: true, signal: abort.signal });
+    document.addEventListener("keydown", onKey, { capture: true, signal: abort.signal });
+    document.addEventListener("scroll", dismiss, { capture: true, signal: abort.signal });
+    window.addEventListener("resize", () => closeSelectPanel(input), { signal: abort.signal });
+}
+
+function setupSelects(scope) {
+    (scope || document).querySelectorAll("select").forEach((select) => {
+        if (select.dataset.enhanced === "1") return;
+        select.dataset.enhanced = "1";
+        select.classList.add("enhanced-select");
+        select.addEventListener("click", (event) => {
+            event.preventDefault();
+            openSelectPanel(select);
+        });
+        select.addEventListener("mousedown", (event) => event.preventDefault());
+        select.addEventListener("focus", () => {
+            if (!select.value) openSelectPanel(select);
+        });
+    });
+    (scope || document).querySelectorAll("input[type='date']").forEach((input) => {
+        if (input.dataset.enhanced === "1") return;
+        input.dataset.enhanced = "1";
+        input.readOnly = true;
+        input.tabIndex = 0;
+        input.addEventListener("click", () => openDatePanel(input));
+        input.addEventListener("focus", () => {
+            if (!input.value) openDatePanel(input);
+        });
+    });
+    (scope || document).querySelectorAll("input[type='time']").forEach((input) => {
+        if (input.dataset.enhanced === "1") return;
+        input.dataset.enhanced = "1";
+        input.readOnly = true;
+        input.tabIndex = 0;
+        input.addEventListener("click", () => openTimePanel(input));
+        input.addEventListener("focus", () => {
+            if (!input.value) openTimePanel(input);
+        });
+    });
+}
+
+function enhanceFormControls(scope) {
+    setupSelects(scope);
+}
+
 async function apiFetch(path, options = {}) {
     const headers = { ...(options.headers || {}) };
     if (state.token) {
@@ -201,6 +509,10 @@ function renderPage(page) {
     } else if (page === "reports") {
         renderReports(content);
     }
+    content.classList.remove("page-enter");
+    // Force reflow so the page-in animation can restart on every navigation.
+    void content.offsetWidth;
+    content.classList.add("page-enter");
 }
 
 function renderMyAttendance(content) {
@@ -553,6 +865,7 @@ async function openEmployeeForm(employee = null) {
             wrap.remove();
         }
     });
+    enhanceFormControls(wrap);
     wrap.querySelector("form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -773,6 +1086,7 @@ async function openDepartmentForm(department = null) {
             wrap.remove();
         }
     });
+    enhanceFormControls(wrap);
     wrap.querySelector("form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -849,6 +1163,7 @@ async function openAssignManagerForm(department) {
             wrap.remove();
         }
     });
+    enhanceFormControls(wrap);
     wrap.querySelector("form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -1100,6 +1415,7 @@ async function openShiftForm(shift = null) {
             wrap.remove();
         }
     });
+    enhanceFormControls(wrap);
     wrap.querySelector("form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;

@@ -7,16 +7,18 @@
 - 本地 MySQL 8，不用 Docker；数据库与账号由 `backend/scripts/setup_db.py` 创建，表结构由 Alembic 迁移初始化。
 - 演示账号：`admin/admin123`（总管理员）、`manager/manager123`（部门管理员，技术部）、`employee/employee123`（普通员工）。
 - 后端虚拟环境：`D:\employee_attendance\backend\.venv`；PyCharm 打开后端项目时解释器应指向它。
+- Git 仓库：`D:\employee_attendance\.git`，当前分支 `master`；`.env`、`.venv/`、`.idea/`、缓存、`web/_screenshots/` 均不入库。
 
 ## 当前架构
 
 - `backend/app`：FastAPI 后端
-  - `routers/`：`auth.py`、`permissions.py`，业务路由尚未实现
+  - `routers/`：`auth.py`、`permissions.py`、`departments.py`、`employees.py`、`shifts.py`
   - `models/`：User、Department、Shift、Attendance、LeaveRequest、BusinessTrip
   - `services/working_time.py`：工时计算、工作日解析、打卡状态
   - `permissions.py`：三角色权限矩阵
   - `seed.py`：幂等演示数据
 - `web/`：深色霓虹 + 玻璃拟态 Web 管理台（`index.html`、`styles.css`、`app.js`）
+- 登录页品牌文案已改为「员工考勤系统 / employee attendance」；演示账号区暂时保留，待成品阶段确认是否移除。
 - `desktop/`、`docs/` 尚未创建
 
 ## 已完成
@@ -25,11 +27,14 @@
 - I2：SQLAlchemy 模型、Alembic 初始迁移、种子脚本、工时计算
 - I3：账号密码登录、JWT、三角色权限矩阵、401/403 测试
 - I4：Web 管理台深色霓虹玻璃拟态界面，三角色菜单、工作台、员工/部门/考勤/审批/班次/报表页面
+- I4 评审高/中优先级修复：空白名称 422 校验、部门列表 N+1 消除、员工/班次列表预加载、员工无部门/跨部门/降级时清空旧部门 manager、班次 PATCH 合并全字段时间校验、全局 `IntegrityError` 返回 409
 - 部门管理员权限限定：只能查看/管理/分配本部门员工与考勤信息，前端已按本部门视角过滤
 - 员工登录默认进入「我的考勤」，不显示总管理工作台
 - 部门管理员登录后与员工一样显示「我的考勤」，本人参与部门考勤统计
 - 部门管理员/总管理员员工管理页有「个人考勤」抽屉弹窗（当前为演示数据）
 - 总管理员不计入考勤统计：`app/permissions.py` 的 `is_attendance_subject(role)` 只允许 `employee`、`department_manager`
+- 前端侧边栏顺序：`我的考勤` 在顶部，`工作台` 在其后
+- 首次 Git 提交 `9a62c21 Initial commit: attendance I1-I4 with web console`（53 文件）
 
 ## 权限模型
 
@@ -53,7 +58,7 @@
 
 ```powershell
 cd D:\employee_attendance\backend
-.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 40 passed）
+.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 53 passed）
 .\.venv\Scripts\python.exe -m scripts.setup_db    # 创建数据库与账号
 .\.venv\Scripts\python.exe -m scripts.init_db     # 执行迁移并写入演示数据
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -62,6 +67,7 @@ node --check D:\employee_attendance\web\app.js    # 前端语法检查
 
 ## 当前状态
 
-- Web 端页面多为演示样式数据，业务 API 尚未全部联调
-- 后端测试 `40 passed, 3 warnings`
+- Web 端页面多为演示样式数据，业务 API 尚未全部联调（组织/员工/班次 CRUD 已有接口）
+- 后端测试 `53 passed, 3 warnings`
+- Git 工作区干净，当前 HEAD 为初始提交 `9a62c21`
 - 下一步：实现员工/部门/打卡/请假/外派/报表等业务路由，并让前端逐步对接真实数据
