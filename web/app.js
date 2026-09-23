@@ -23,14 +23,83 @@ function escapeAttr(value) {
     return escapeHtml(value);
 }
 
+function pad2(value) {
+    return String(value).padStart(2, "0");
+}
+
+function formatLocalDate(date = new Date()) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function parseLocalDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    const date = new Date(year, month, day);
+    return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day
+        ? date
+        : null;
+}
+
+function mountPanel(control, wrap) {
+    document.body.appendChild(wrap);
+    control._panelWrap = wrap;
+}
+
+function positionPanel(wrap, trigger) {
+    const rect = trigger.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const maxPanelHeight = Math.max(120, viewportHeight - margin * 2);
+    if (wrap.offsetHeight > maxPanelHeight) {
+        wrap.style.maxHeight = `${maxPanelHeight}px`;
+        wrap.style.overflowY = "auto";
+    }
+    const panelHeight = wrap.offsetHeight;
+    const panelWidth = wrap.offsetWidth;
+    let top = rect.bottom + gap;
+    if (top + panelHeight > viewportHeight - margin) {
+        const above = rect.top - gap - panelHeight;
+        top = above >= margin
+            ? above
+            : Math.max(margin, viewportHeight - margin - panelHeight);
+    }
+    let left = rect.left;
+    const maxLeft = viewportWidth - margin - panelWidth;
+    if (left > maxLeft) left = Math.max(margin, maxLeft);
+    if (left < margin) left = margin;
+    wrap.style.top = `${Math.round(top)}px`;
+    wrap.style.left = `${Math.round(left)}px`;
+}
+
+function scrollActiveIntoView(container) {
+    const active = container.querySelector(".active");
+    if (!active) return;
+    const box = container.getBoundingClientRect();
+    const item = active.getBoundingClientRect();
+    if (item.top < box.top) {
+        container.scrollTop -= box.top - item.top + 4;
+    } else if (item.bottom > box.bottom) {
+        container.scrollTop += item.bottom - box.bottom + 4;
+    }
+}
+
 function openSelectPanel(select) {
     if (select.dataset.panelOpen === "1") {
         return;
     }
+    if (select._panelWrap) {
+        closeSelectPanel(select);
+    }
     select.dataset.panelOpen = "1";
     const wrap = document.createElement("div");
     wrap.className = "select-pop-wrap";
-    wrap.style.minWidth = `${Math.max(select.offsetWidth, 180)}px`;
+    const availableWidth = Math.max(120, (document.documentElement.clientWidth || window.innerWidth) - 16);
+    wrap.style.minWidth = `${Math.min(Math.max(select.offsetWidth, 180), availableWidth)}px`;
     wrap.innerHTML = `
         <div class="select-pop glass" role="listbox" tabindex="-1"></div>
     `;
@@ -48,10 +117,9 @@ function openSelectPanel(select) {
         });
         list.appendChild(item);
     });
-    select.insertAdjacentElement("afterend", wrap);
-    const rect = select.getBoundingClientRect();
-    wrap.style.top = `${rect.bottom + 6}px`;
-    wrap.style.left = `${rect.left}px`;
+    mountPanel(select, wrap);
+    positionPanel(wrap, select);
+    scrollActiveIntoView(list);
     const dismiss = (event) => {
         if (!wrap.contains(event.target) && event.target !== select) {
             closeSelectPanel(select);
@@ -72,19 +140,32 @@ function openSelectPanel(select) {
 }
 
 function closeSelectPanel(select) {
-    if (select.dataset.panelOpen !== "1") return;
-    const wrap = select.nextElementSibling;
-    if (wrap?.classList.contains("select-pop-wrap")) {
-        wrap.remove();
-    }
+    const wrap = select._panelWrap;
+    if (!wrap && select.dataset.panelOpen !== "1") return;
+    wrap?.remove();
+    select._panelWrap = null;
     select._panelAbort?.abort();
     select._panelAbort = null;
     select.dataset.panelOpen = "0";
 }
 
+function closeOpenPanels(scope) {
+    (scope || document).querySelectorAll("[data-panel-open='1']").forEach((control) => {
+        closeSelectPanel(control);
+    });
+}
+
+function removeModal(wrap) {
+    closeOpenPanels(wrap);
+    wrap.remove();
+}
+
 function openDatePanel(input) {
     if (input.dataset.panelOpen === "1") {
         return;
+    }
+    if (input._panelWrap) {
+        closeSelectPanel(input);
     }
     input.dataset.panelOpen = "1";
     const wrap = document.createElement("div");
@@ -98,10 +179,9 @@ function openDatePanel(input) {
     const pop = wrap.querySelector(".date-pop");
     const header = wrap.querySelector(".date-pop-header");
     const grid = wrap.querySelector(".date-pop-grid");
-    const yearNow = new Date().getFullYear();
-    const monthNow = new Date().getMonth();
-    let viewYear = yearNow;
-    let viewMonth = monthNow;
+    const initialDate = parseLocalDate(input.value) || new Date();
+    let viewYear = initialDate.getFullYear();
+    let viewMonth = initialDate.getMonth();
     const pick = (iso) => {
         input.value = iso;
         input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -113,7 +193,7 @@ function openDatePanel(input) {
             const today = new Date();
             viewYear = today.getFullYear();
             viewMonth = today.getMonth();
-            pick(today.toISOString().slice(0, 10));
+            pick(formatLocalDate(today));
         } else if (event.target.closest("[data-action='prev']")) {
             viewMonth -= 1;
             if (viewMonth < 0) {
@@ -154,21 +234,21 @@ function openDatePanel(input) {
             grid.insertAdjacentHTML("beforeend", '<span class="date-pop-empty"></span>');
         }
         const selectedIso = input.value || "";
+        const todayIso = formatLocalDate();
         for (let day = 1; day <= daysInMonth; day += 1) {
             const iso = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const classes = ["date-pop-day"];
             if (iso === selectedIso) classes.push("active");
-            if (iso === new Date().toISOString().slice(0, 10)) classes.push("today");
+            if (iso === todayIso) classes.push("today");
             grid.insertAdjacentHTML("beforeend", `<button type="button" class="${classes.join(" ")}" data-day="${day}">${day}</button>`);
         }
     };
     render();
     pop.addEventListener("mousedown", (event) => event.preventDefault());
     pop.addEventListener("click", onClick);
-    input.insertAdjacentElement("afterend", wrap);
-    const rect = input.getBoundingClientRect();
-    wrap.style.top = `${rect.bottom + 6}px`;
-    wrap.style.left = `${rect.left}px`;
+    mountPanel(input, wrap);
+    positionPanel(wrap, input);
+    requestAnimationFrame(() => scrollActiveIntoView(pop));
     const dismiss = (event) => {
         if (!wrap.contains(event.target) && event.target !== input) {
             closeSelectPanel(input);
@@ -191,15 +271,26 @@ function openTimePanel(input) {
     if (input.dataset.panelOpen === "1") {
         return;
     }
+    if (input._panelWrap) {
+        closeSelectPanel(input);
+    }
     input.dataset.panelOpen = "1";
+    const snapMinute = (value) => Math.min(55, Math.max(0, Math.round(value / 5) * 5));
     const now = new Date();
     let hour = now.getHours();
-    let minute = now.getMinutes();
+    let minute = snapMinute(now.getMinutes());
     if (input.value) {
         const [rawHour, rawMinute] = input.value.split(":").map(Number);
-        if (Number.isInteger(rawHour) && Number.isInteger(rawMinute)) {
+        if (
+            Number.isInteger(rawHour) &&
+            rawHour >= 0 &&
+            rawHour <= 23 &&
+            Number.isInteger(rawMinute) &&
+            rawMinute >= 0 &&
+            rawMinute <= 59
+        ) {
             hour = rawHour;
-            minute = rawMinute;
+            minute = snapMinute(rawMinute);
         }
     }
     const wrap = document.createElement("div");
@@ -244,13 +335,17 @@ function openTimePanel(input) {
             const active = label === selectedMinute ? " active" : "";
             return `<button type="button" class="time-pop-cell${active}" data-minute="${i * 5}">${label}</button>`;
         }).join("");
+        requestAnimationFrame(() => {
+            scrollActiveIntoView(hoursGrid);
+            scrollActiveIntoView(minutesGrid);
+        });
     };
     const onClick = (event) => {
         const nowBtn = event.target.closest("[data-action='now']");
         if (nowBtn) {
             const today = new Date();
             hour = today.getHours();
-            minute = Math.floor(today.getMinutes() / 5) * 5;
+            minute = snapMinute(today.getMinutes());
             render();
             return;
         }
@@ -269,10 +364,8 @@ function openTimePanel(input) {
     render();
     pop.addEventListener("mousedown", (event) => event.preventDefault());
     pop.addEventListener("click", onClick);
-    input.insertAdjacentElement("afterend", wrap);
-    const rect = input.getBoundingClientRect();
-    wrap.style.top = `${rect.bottom + 6}px`;
-    wrap.style.left = `${rect.left}px`;
+    mountPanel(input, wrap);
+    positionPanel(wrap, input);
     const dismiss = (event) => {
         if (!wrap.contains(event.target) && event.target !== input) {
             closeSelectPanel(input);
@@ -308,8 +401,12 @@ function setupSelects(scope) {
     (scope || document).querySelectorAll("input[type='date']").forEach((input) => {
         if (input.dataset.enhanced === "1") return;
         input.dataset.enhanced = "1";
+        input.type = "text";
         input.readOnly = true;
         input.tabIndex = 0;
+        input.dataset.kind = "date";
+        input.classList.add("enhanced-picker");
+        input.placeholder = "选择日期";
         input.addEventListener("click", () => openDatePanel(input));
         input.addEventListener("focus", () => {
             if (!input.value) openDatePanel(input);
@@ -318,8 +415,12 @@ function setupSelects(scope) {
     (scope || document).querySelectorAll("input[type='time']").forEach((input) => {
         if (input.dataset.enhanced === "1") return;
         input.dataset.enhanced = "1";
+        input.type = "text";
         input.readOnly = true;
         input.tabIndex = 0;
+        input.dataset.kind = "time";
+        input.classList.add("enhanced-picker");
+        input.placeholder = "选择时间";
         input.addEventListener("click", () => openTimePanel(input));
         input.addEventListener("focus", () => {
             if (!input.value) openTimePanel(input);
@@ -475,6 +576,7 @@ function hasPermission(permission) {
 }
 
 function navigate(page) {
+    closeOpenPanels(document);
     const guard = ROUTE_GUARDS[page];
     if (guard && !hasPermission(guard)) {
         page = "dashboard";
@@ -862,7 +964,7 @@ async function openEmployeeForm(employee = null) {
     if (employee?.role) selectRole.value = employee.role;
     wrap.addEventListener("click", (event) => {
         if (event.target === wrap || event.target.closest("[data-action='cancel'], .modal-close")) {
-            wrap.remove();
+            removeModal(wrap);
         }
     });
     enhanceFormControls(wrap);
@@ -895,7 +997,7 @@ async function openEmployeeForm(employee = null) {
                 });
                 toast("员工已创建");
             }
-            wrap.remove();
+            removeModal(wrap);
             renderEmployees($("#page-content"));
         } catch (err) {
             toast(err.message);
@@ -1083,7 +1185,7 @@ async function openDepartmentForm(department = null) {
     `;
     wrap.addEventListener("click", (event) => {
         if (event.target === wrap || event.target.closest("[data-action='cancel'], .modal-close")) {
-            wrap.remove();
+            removeModal(wrap);
         }
     });
     enhanceFormControls(wrap);
@@ -1108,7 +1210,7 @@ async function openDepartmentForm(department = null) {
                 });
                 toast("部门已创建");
             }
-            wrap.remove();
+            removeModal(wrap);
             renderDepartments($("#page-content"));
         } catch (err) {
             toast(err.message);
@@ -1160,7 +1262,7 @@ async function openAssignManagerForm(department) {
     `;
     wrap.addEventListener("click", (event) => {
         if (event.target === wrap || event.target.closest("[data-action='cancel'], .modal-close")) {
-            wrap.remove();
+            removeModal(wrap);
         }
     });
     enhanceFormControls(wrap);
@@ -1176,7 +1278,7 @@ async function openAssignManagerForm(department) {
                 body: JSON.stringify(payload),
             });
             toast("管理员已指派");
-            wrap.remove();
+            removeModal(wrap);
             renderDepartments($("#page-content"));
         } catch (err) {
             toast(err.message);
@@ -1412,7 +1514,7 @@ async function openShiftForm(shift = null) {
     `;
     wrap.addEventListener("click", (event) => {
         if (event.target === wrap || event.target.closest("[data-action='cancel'], .modal-close")) {
-            wrap.remove();
+            removeModal(wrap);
         }
     });
     enhanceFormControls(wrap);
@@ -1450,7 +1552,7 @@ async function openShiftForm(shift = null) {
                 });
                 toast("班次已创建");
             }
-            wrap.remove();
+            removeModal(wrap);
             renderShifts($("#page-content"));
         } catch (err) {
             toast(err.message);
