@@ -35,6 +35,8 @@
 - 总管理员不计入考勤统计：`app/permissions.py` 的 `is_attendance_subject(role)` 只允许 `employee`、`department_manager`
 - 前端侧边栏顺序：`我的考勤` 在顶部，`工作台` 在其后
 - 首次 Git 提交 `9a62c21 Initial commit: attendance I1-I4 with web console`（53 文件）
+- 前端表单控件与弹层修复（提交 `79f0d48 Fix form picker behavior and popup positioning`）：自定义下拉框、日期/时间选择器弹层改为挂载到 `body`，增加视口边界定位与活动项滚动；修复模态框关闭和页面切换后的弹层残留；修正本地日期解析、时间按 5 分钟取整以及表单操作区换行。
+- “下拉框和日期/时间选择框默认方框透明、无边框”的最后一次尝试已由用户检查后撤销，未包含在提交 `79f0d48` 中。
 
 ## 权限模型
 
@@ -69,5 +71,5 @@ node --check D:\employee_attendance\web\app.js    # 前端语法检查
 
 - Web 端页面多为演示样式数据，业务 API 尚未全部联调（组织/员工/班次 CRUD 已有接口）
 - 后端测试 `53 passed, 3 warnings`
-- Git 工作区干净，当前 HEAD 为初始提交 `9a62c21`
+- 最近前端修复提交为 `79f0d48 Fix form picker behavior and popup positioning`；本次记忆更新提交后工作区应保持干净
 - 下一步：实现员工/部门/打卡/请假/外派/报表等业务路由，并让前端逐步对接真实数据
