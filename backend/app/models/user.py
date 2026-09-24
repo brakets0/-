@@ -33,3 +33,7 @@ class User(Base):
 
     department = relationship("Department", back_populates="employees")
 
+    @property
+    def department_name(self) -> str | None:
+        """供账号资料接口直接返回所属部门名称。"""
+        return self.department.name if self.department else None

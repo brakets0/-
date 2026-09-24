@@ -14,6 +14,7 @@ def test_login_success_returns_token_and_profile(app_client, seed_user):
     assert data["expires_in"] > 0
     assert data["user"]["username"] == "tester"
     assert data["user"]["role"] == "employee"
+    assert "department_name" in data["user"]
     assert "password_hash" not in data["user"]
 
     me = app_client.get(

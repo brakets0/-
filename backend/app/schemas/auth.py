@@ -21,6 +21,7 @@ class UserProfile(BaseModel):
     name: str
     role: str
     department_id: int | None = None
+    department_name: str | None = None
     status: str
 
 

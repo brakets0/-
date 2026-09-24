@@ -814,6 +814,54 @@ button {
     flex-wrap: wrap;
 }
 
+.filter-toolbar {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.filter-toolbar .filter-field {
+    flex: 0 1 220px;
+    min-width: 170px;
+    gap: 6px;
+}
+
+.filter-toolbar .filter-field > span {
+    font-size: 12px;
+}
+
+.filter-toolbar .btn {
+    flex: 0 0 auto;
+}
+
+.filter-static {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: var(--control-bg);
+    color: #d7e2f5;
+    font-size: 13px;
+}
+
+.filter-summary {
+    margin: -2px 0 14px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.table-muted {
+    color: var(--muted);
+}
+
 .btn-ghost {
     padding: 10px 15px;
     color: #d7e2f5;
@@ -1125,7 +1173,8 @@ button {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
     width: 100%;
     padding: 10px 12px;
     border-radius: var(--radius-control);
@@ -1138,12 +1187,19 @@ button {
     transition: border-color 0.14s var(--ease-out), box-shadow 0.16s var(--ease-out), background 0.14s, color 0.14s;
 }
 
-.form-field input::placeholder {
+.form-field textarea {
+    min-height: 92px;
+    resize: vertical;
+}
+
+.form-field input::placeholder,
+.form-field textarea::placeholder {
     color: rgba(139, 148, 171, 0.7);
 }
 
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
     outline: none;
     border-color: var(--control-focus);
     background-color: var(--control-bg-hover);
@@ -1151,7 +1207,8 @@ button {
 }
 
 .form-field input:hover:not(:focus),
-.form-field select:hover:not(:focus) {
+.form-field select:hover:not(:focus),
+.form-field textarea:hover:not(:focus) {
     border-color: rgba(90, 220, 255, 0.28);
     background-color: var(--control-bg-hover);
 }
@@ -1560,9 +1617,31 @@ button {
         flex-direction: column;
     }
 
+    .topbar-actions {
+        width: 100%;
+    }
+
+    .topbar-time {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .filter-toolbar .filter-field,
+    .filter-toolbar .btn {
+        flex-basis: 100%;
+        width: 100%;
+    }
+
     .data-table {
         display: block;
         overflow-x: auto;
+    }
+
+    .data-table th,
+    .data-table td {
+        white-space: nowrap;
     }
 
     .attendance-drawer {
