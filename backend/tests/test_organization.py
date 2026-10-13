@@ -95,13 +95,13 @@ def _seed_org(db_engine):
 
 
 def test_departments_require_login(app_client):
-    assert app_client.get("/departments").status_code == 401
+    assert app_client.get("/api/departments").status_code == 401
 
 
 def test_department_list_allows_any_active_user(app_client, db_engine):
     admin, manager, _, _, _, _ = _seed_org(db_engine)
     for user in (admin, manager):
-        response = app_client.get("/departments", headers=_headers(user))
+        response = app_client.get("/api/departments", headers=_headers(user))
         assert response.status_code == 200
         assert {item["name"] for item in response.json()} == {"技术部", "人事部"}
 
@@ -110,14 +110,14 @@ def test_department_crud_admin_only(app_client, db_engine):
     admin, manager, _, _, _, _ = _seed_org(db_engine)
 
     denied = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(manager),
         json={"name": "财务部"},
     )
     assert denied.status_code == 403
 
     created = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "财务部"},
     )
@@ -125,14 +125,14 @@ def test_department_crud_admin_only(app_client, db_engine):
     assert created.json()["name"] == "财务部"
 
     duplicate = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "财务部"},
     )
     assert duplicate.status_code == 409
 
     updated = app_client.patch(
-        f"/departments/{created.json()['id']}",
+        f"/api/departments/{created.json()['id']}",
         headers=_headers(admin),
         json={"name": "财务与审计部"},
     )
@@ -140,7 +140,7 @@ def test_department_crud_admin_only(app_client, db_engine):
     assert updated.json()["name"] == "财务与审计部"
 
     deleted = app_client.delete(
-        f"/departments/{created.json()['id']}",
+        f"/api/departments/{created.json()['id']}",
         headers=_headers(admin),
     )
     assert deleted.status_code == 204
@@ -150,28 +150,28 @@ def test_department_assign_manager_validates_role_and_department(app_client, db_
     admin, manager, employee, _, tech, hr = _seed_org(db_engine)
 
     wrong_role = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "运营部", "manager_user_id": employee.id},
     )
     assert wrong_role.status_code == 400
 
     wrong_department = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "运营部", "manager_user_id": manager.id},
     )
     assert wrong_department.status_code == 400
 
     created = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "运营部"},
     )
     assert created.status_code == 200
 
     assigned = app_client.patch(
-        f"/departments/{created.json()['id']}",
+        f"/api/departments/{created.json()['id']}",
         headers=_headers(admin),
         json={"manager_user_id": manager.id},
     )
@@ -184,7 +184,7 @@ def test_department_assign_manager_validates_role_and_department(app_client, db_
         manager_row.department_id = created.json()["id"]
         db.commit()
     assigned_ok = app_client.patch(
-        f"/departments/{created.json()['id']}",
+        f"/api/departments/{created.json()['id']}",
         headers=_headers(admin),
         json={"manager_user_id": manager.id},
     )
@@ -195,15 +195,15 @@ def test_department_assign_manager_validates_role_and_department(app_client, db_
 def test_employee_list_respects_department_scope(app_client, db_engine):
     admin, manager, employee, hr_employee, tech, hr = _seed_org(db_engine)
 
-    employee_response = app_client.get("/employees", headers=_headers(employee))
+    employee_response = app_client.get("/api/employees", headers=_headers(employee))
     assert employee_response.status_code == 403
 
-    manager_response = app_client.get("/employees", headers=_headers(manager))
+    manager_response = app_client.get("/api/employees", headers=_headers(manager))
     assert manager_response.status_code == 200
     names = {item["name"] for item in manager_response.json()}
     assert names == {"manager", "employee"}
 
-    admin_response = app_client.get("/employees", headers=_headers(admin))
+    admin_response = app_client.get("/api/employees", headers=_headers(admin))
     assert admin_response.status_code == 200
     names = {item["name"] for item in admin_response.json()}
     assert names == {"admin", "manager", "employee", "hr_employee"}
@@ -220,36 +220,36 @@ def test_create_employee_validation_and_scope(app_client, db_engine):
         "role": "employee",
         "department_id": tech.id,
     }
-    created = app_client.post("/employees", headers=_headers(admin), json=payload)
+    created = app_client.post("/api/employees", headers=_headers(admin), json=payload)
     assert created.status_code == 200
     assert created.json()["department_name"] == "技术部"
 
-    duplicate = app_client.post("/employees", headers=_headers(admin), json=payload)
+    duplicate = app_client.post("/api/employees", headers=_headers(admin), json=payload)
     assert duplicate.status_code == 409
 
     no_department = app_client.post(
-        "/employees",
+        "/api/employees",
         headers=_headers(admin),
         json={**payload, "username": "nobody", "department_id": None},
     )
     assert no_department.status_code == 400
 
     promote_by_manager = app_client.post(
-        "/employees",
+        "/api/employees",
         headers=_headers(manager),
         json={**payload, "username": "promoted", "role": "department_manager"},
     )
     assert promote_by_manager.status_code == 403
 
     manager_created = app_client.post(
-        "/employees",
+        "/api/employees",
         headers=_headers(manager),
         json={**payload, "username": "manager_newbie", "employee_no": "E01002"},
     )
     assert manager_created.status_code == 200
 
     cross_department = app_client.post(
-        "/employees",
+        "/api/employees",
         headers=_headers(manager),
         json={**payload, "username": "cross", "employee_no": "E01003", "department_id": hr.id},
     )
@@ -260,14 +260,14 @@ def test_blank_names_rejected(app_client, db_engine):
     admin, _, _, _, tech, _ = _seed_org(db_engine)
 
     blank_department = app_client.post(
-        "/departments",
+        "/api/departments",
         headers=_headers(admin),
         json={"name": "   "},
     )
     assert blank_department.status_code == 422
 
     blank_employee = app_client.post(
-        "/employees",
+        "/api/employees",
         headers=_headers(admin),
         json={
             "employee_no": "  ",
@@ -285,21 +285,21 @@ def test_update_employee_enforces_manager_scope(app_client, db_engine):
     admin, manager, employee, hr_employee, tech, hr = _seed_org(db_engine)
 
     cross_update = app_client.patch(
-        f"/employees/{hr_employee.id}",
+        f"/api/employees/{hr_employee.id}",
         headers=_headers(manager),
         json={"name": "越权改名"},
     )
     assert cross_update.status_code == 403
 
     promote = app_client.patch(
-        f"/employees/{employee.id}",
+        f"/api/employees/{employee.id}",
         headers=_headers(manager),
         json={"role": "department_manager"},
     )
     assert promote.status_code == 403
 
     rename = app_client.patch(
-        f"/employees/{employee.id}",
+        f"/api/employees/{employee.id}",
         headers=_headers(manager),
         json={"name": "本部门员工"},
     )
@@ -307,7 +307,7 @@ def test_update_employee_enforces_manager_scope(app_client, db_engine):
     assert rename.json()["name"] == "本部门员工"
 
     move = app_client.patch(
-        f"/employees/{employee.id}",
+        f"/api/employees/{employee.id}",
         headers=_headers(admin),
         json={"department_id": hr.id},
     )
@@ -319,7 +319,7 @@ def test_update_employee_clears_stale_manager_assignment(app_client, db_engine):
     admin, manager, _, _, tech, hr = _seed_org(db_engine)
 
     promoted = app_client.patch(
-        f"/employees/{manager.id}",
+        f"/api/employees/{manager.id}",
         headers=_headers(admin),
         json={"role": "department_manager", "department_id": hr.id},
     )
@@ -335,14 +335,14 @@ def test_update_employee_clears_stale_manager_assignment(app_client, db_engine):
         assert tech_row.manager_user_id is None
 
     demoted = app_client.patch(
-        f"/employees/{manager.id}",
+        f"/api/employees/{manager.id}",
         headers=_headers(admin),
         json={"role": "employee"},
     )
     assert demoted.status_code == 200
 
     no_department = app_client.patch(
-        f"/employees/{manager.id}",
+        f"/api/employees/{manager.id}",
         headers=_headers(admin),
         json={"department_id": None},
     )
@@ -352,13 +352,13 @@ def test_update_employee_clears_stale_manager_assignment(app_client, db_engine):
 def test_delete_employee_admin_only(app_client, db_engine):
     admin, manager, employee, hr_employee, tech, hr = _seed_org(db_engine)
 
-    denied = app_client.delete(f"/employees/{employee.id}", headers=_headers(manager))
+    denied = app_client.delete(f"/api/employees/{employee.id}", headers=_headers(manager))
     assert denied.status_code == 403
 
-    self_delete = app_client.delete(f"/employees/{admin.id}", headers=_headers(admin))
+    self_delete = app_client.delete(f"/api/employees/{admin.id}", headers=_headers(admin))
     assert self_delete.status_code == 400
 
-    deleted = app_client.delete(f"/employees/{employee.id}", headers=_headers(admin))
+    deleted = app_client.delete(f"/api/employees/{employee.id}", headers=_headers(admin))
     assert deleted.status_code == 204
 
 
@@ -375,43 +375,43 @@ def test_shift_crud_and_workdays_validation(app_client, db_engine):
     }
 
     bad_workdays = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(admin),
         json={**base, "workdays": "1,8"},
     )
     assert bad_workdays.status_code == 422
 
     bad_duplicates = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(admin),
         json={**base, "workdays": "1,1,2"},
     )
     assert bad_duplicates.status_code == 422
 
     bad_times = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(admin),
         json={**base, "work_start": "18:00", "work_end": "09:00"},
     )
     assert bad_times.status_code == 422
 
     bad_break = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(admin),
         json={**base, "break_start": None, "break_end": "13:00"},
     )
     assert bad_break.status_code == 422
 
-    created = app_client.post("/shifts", headers=_headers(admin), json=base)
+    created = app_client.post("/api/shifts", headers=_headers(admin), json=base)
     assert created.status_code == 200
     assert created.json()["workdays"] == "1,2,3,4,5"
     assert created.json()["department_name"] == "技术部"
 
-    duplicate = app_client.post("/shifts", headers=_headers(admin), json=base)
+    duplicate = app_client.post("/api/shifts", headers=_headers(admin), json=base)
     assert duplicate.status_code == 409
 
     normalized = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(admin),
         json={**base, "workdays": "5,1,3", "effective_from": "2026-10-01"},
     )
@@ -419,7 +419,7 @@ def test_shift_crud_and_workdays_validation(app_client, db_engine):
     assert normalized.json()["workdays"] == "1,3,5"
 
     updated = app_client.patch(
-        f"/shifts/{created.json()['id']}",
+        f"/api/shifts/{created.json()['id']}",
         headers=_headers(admin),
         json={"work_start": "08:30"},
     )
@@ -427,7 +427,7 @@ def test_shift_crud_and_workdays_validation(app_client, db_engine):
     assert updated.json()["work_start"] == "08:30:00"
 
     deleted = app_client.delete(
-        f"/shifts/{created.json()['id']}",
+        f"/api/shifts/{created.json()['id']}",
         headers=_headers(admin),
     )
     assert deleted.status_code == 204
@@ -445,21 +445,21 @@ def test_shift_department_manager_scope(app_client, db_engine):
         "effective_from": "2026-09-01",
     }
 
-    denied = app_client.post("/shifts", headers=_headers(manager), json=base)
+    denied = app_client.post("/api/shifts", headers=_headers(manager), json=base)
     assert denied.status_code == 403
 
     own = app_client.post(
-        "/shifts",
+        "/api/shifts",
         headers=_headers(manager),
         json={**base, "department_id": tech.id},
     )
     assert own.status_code == 200
 
-    listing = app_client.get("/shifts", headers=_headers(manager))
+    listing = app_client.get("/api/shifts", headers=_headers(manager))
     assert listing.status_code == 200
     assert {item["department_name"] for item in listing.json()} == {"技术部"}
 
-    admin_listing = app_client.get("/shifts", headers=_headers(admin))
+    admin_listing = app_client.get("/api/shifts", headers=_headers(admin))
     assert {item["department_name"] for item in admin_listing.json()} == {"技术部"}
 
 
@@ -474,18 +474,18 @@ def test_shift_patch_validates_against_existing_end(app_client, db_engine):
         "workdays": "1,2,3,4,5",
         "effective_from": "2026-09-01",
     }
-    created = app_client.post("/shifts", headers=_headers(admin), json=base)
+    created = app_client.post("/api/shifts", headers=_headers(admin), json=base)
     assert created.status_code == 200
 
     invalid = app_client.patch(
-        f"/shifts/{created.json()['id']}",
+        f"/api/shifts/{created.json()['id']}",
         headers=_headers(admin),
         json={"work_end": "08:00"},
     )
     assert invalid.status_code == 422
 
     valid = app_client.patch(
-        f"/shifts/{created.json()['id']}",
+        f"/api/shifts/{created.json()['id']}",
         headers=_headers(admin),
         json={"work_end": "18:30"},
     )

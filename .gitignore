@@ -19,8 +19,7 @@ Thumbs.db
 # Runtime artifacts
 *.db
 logs/
+backend/.uvicorn*.log
+backend/.smoke-out.txt
 tests/.pytest_cache/
 .pytest_cache/
-
-# Local UI screenshots
-web/_screenshots/

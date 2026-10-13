@@ -7,16 +7,24 @@ I1 阶段目标：
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 
 from app import models  # noqa: F401
 from app.database import Base
 from app.config import settings
-from app.routers import auth, departments, employees, permissions, shifts
+from app.routers import (
+    attendance,
+    auth,
+    departments,
+    employees,
+    permissions,
+    reports,
+    requests,
+    shifts,
+)
 
 
 app = FastAPI(
@@ -25,11 +33,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# 开发阶段允许本地桌面端与 Web 管理台访问；后续按域名收紧。
+# 前后端分离后仅放行本地 Vite 开发源；使用 Bearer 令牌，无需携带 Cookie。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -44,25 +55,43 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
     )
 
 
-app.include_router(auth.router)
-app.include_router(permissions.router)
-app.include_router(departments.router)
-app.include_router(employees.router)
-app.include_router(shifts.router)
+# 业务接口统一挂在 /api 下，与前端静态资源、/health、/docs 分离。
+API_PREFIX = "/api"
+
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(permissions.router, prefix=API_PREFIX)
+app.include_router(departments.router, prefix=API_PREFIX)
+app.include_router(employees.router, prefix=API_PREFIX)
+app.include_router(shifts.router, prefix=API_PREFIX)
+app.include_router(attendance.router, prefix=API_PREFIX)
+app.include_router(requests.leave_router, prefix=API_PREFIX)
+app.include_router(requests.trip_router, prefix=API_PREFIX)
+app.include_router(reports.router, prefix=API_PREFIX)
 
 
-@app.get("/")
-def root():
-    """根路径：优先返回 Web 管理台页面，否则返回 API 基本信息。"""
-    web_index = WEB_DIR / "index.html"
-    if web_index.is_file():
-        return HTMLResponse(web_index.read_text(encoding="utf-8"))
-    return {
-        "app": settings.app_name,
-        "version": "0.1.0",
-        "status": "ok",
-        "docs": "/docs",
-    }
+# P4：前端构建产物由 FastAPI 托管，开发态仍由 Vite 提供。
+FRONTEND_DIST = (
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+)
+
+
+def _dist_file(relative_path: str) -> Path:
+    """把请求路径安全解析到 dist 内，阻止 `..` 目录穿越。"""
+    candidate = (FRONTEND_DIST / relative_path).resolve()
+    dist_root = FRONTEND_DIST.resolve()
+    if candidate != dist_root and dist_root not in candidate.parents:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    return candidate
+
+
+def _spa_index() -> FileResponse:
+    index_file = FRONTEND_DIST / "index.html"
+    if not index_file.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="前端尚未构建，请先在 frontend 目录执行 npm run build",
+        )
+    return FileResponse(index_file)
 
 
 @app.get("/health")
@@ -75,7 +104,27 @@ def health():
     }
 
 
-# I4：Web 管理台静态资源（放在所有 API 路由之后定义）
-WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
-if WEB_DIR.is_dir():
-    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web-console")
+@app.get("/assets/{asset_path:path}", include_in_schema=False)
+def serve_asset(asset_path: str):
+    """返回 Vite 构建出的静态资源。"""
+    asset = _dist_file(f"assets/{asset_path}")
+    if not asset.is_file():
+        raise HTTPException(status_code=404, detail="资源不存在")
+    return FileResponse(asset)
+
+
+@app.get("/", include_in_schema=False)
+def spa_index():
+    """根路径返回 Vue 应用入口。"""
+    return _spa_index()
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa_fallback(full_path: str):
+    """SPA 兜底：静态文件优先，其余路径交给 vue-router。"""
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="接口不存在")
+    requested = _dist_file(full_path)
+    if full_path and requested.is_file():
+        return FileResponse(requested)
+    return _spa_index()

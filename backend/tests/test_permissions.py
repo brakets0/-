@@ -79,14 +79,14 @@ def test_employee_and_department_manager_included_in_attendance_statistics():
 
 
 def test_permission_matrix_requires_admin(app_client):
-    assert app_client.get("/permissions/matrix").status_code == 401
+    assert app_client.get("/api/permissions/matrix").status_code == 401
 
 
 def test_permission_matrix_allows_general_admin(app_client, role_user):
     user = role_user("general_admin")
     token = _token_for_user(user)
     response = app_client.get(
-        "/permissions/matrix",
+        "/api/permissions/matrix",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
@@ -101,7 +101,7 @@ def test_employee_cannot_access_admin_probe(app_client, role_user):
     user = role_user("employee")
     token = _token_for_user(user)
     response = app_client.get(
-        "/permissions/admin-check",
+        "/api/permissions/admin-check",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
@@ -111,7 +111,7 @@ def test_department_manager_cannot_access_admin_probe(app_client, role_user):
     user = role_user("department_manager")
     token = _token_for_user(user)
     response = app_client.get(
-        "/permissions/admin-check",
+        "/api/permissions/admin-check",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
@@ -121,7 +121,7 @@ def test_general_admin_can_access_admin_probe(app_client, role_user):
     user = role_user("general_admin")
     token = _token_for_user(user)
     response = app_client.get(
-        "/permissions/admin-check",
+        "/api/permissions/admin-check",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
@@ -132,7 +132,7 @@ def test_department_probe_allows_manager_and_admin(app_client, role_user):
         user = role_user(role)
         token = _token_for_user(user)
         response = app_client.get(
-            "/permissions/department-check",
+            "/api/permissions/department-check",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
@@ -143,7 +143,7 @@ def test_employee_manage_probe_allows_manager_and_admin(app_client, role_user):
         user = role_user(role)
         token = _token_for_user(user)
         response = app_client.get(
-            "/permissions/employee-manage-check",
+            "/api/permissions/employee-manage-check",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
@@ -153,7 +153,7 @@ def test_employee_cannot_access_employee_manage_probe(app_client, role_user):
     user = role_user("employee")
     token = _token_for_user(user)
     response = app_client.get(
-        "/permissions/employee-manage-check",
+        "/api/permissions/employee-manage-check",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403

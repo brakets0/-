@@ -15,9 +15,9 @@ E:\MySQL\mysql-8.0.24-winx64\bin\mysql.exe
 
 ```text
 employee_attendance/
-├── backend/          # FastAPI 后端
+├── backend/          # FastAPI 后端（API + 托管构建后的前端）
 ├── desktop/          # wxPython 员工桌面端（后续迭代）
-├── web/              # Web 管理台（深色霓虹玻璃拟态，I4 已搭建）
+├── frontend/         # Vue 3 + Vite + Element Plus 管理台
 ├── docs/             # 设计文档与迭代记录
 └── .env.example
 ```
@@ -31,6 +31,10 @@ employee_attendance/
 - I4：Web 管理台：登录页、三角色菜单、工作台/员工/部门/考勤/审批/班次/报表页面，
   员工默认进入个人考勤页、管理员可见工作台，深色霓虹玻璃拟态视觉、按钮动态交互、
   静态资源挂载。
+- P0-P2：前端迁移为 Vue 3 + Vite + Pinia + Element Plus，业务接口统一 `/api` 前缀，
+  登录、权限菜单、员工/部门/班次页面完成迁移。
+- I5：考勤打卡、我的考勤、考勤中心、请假/外派审批、月度报表（含 CSV 导出）接口与页面。
+- P4：下线旧原生控制台，FastAPI 直接托管 `frontend/dist`，前端路由深链接由 SPA 兜底。
 - 后端测试：健康检查、模型约束、迁移 SQL、种子、工时函数。
 
 ## 演示账号
@@ -41,8 +45,19 @@ employee_attendance/
 | 部门管理员 | `manager` | `manager123` | 本部门考勤/审批/班次 |
 | 普通员工 | `employee` | `employee123` | 打卡、请假、外派、个人报表 |
 
-登录接口：`POST /auth/login`，返回 JWT；访问受保护接口时在请求头携带
-`Authorization: Bearer <access_token>`。
+业务接口统一挂在 `/api` 前缀下：登录接口 `POST /api/auth/login` 返回 JWT；
+访问受保护接口时在请求头携带 `Authorization: Bearer <access_token>`。
+`/health` 与 `/docs` 保留在根路径。
+
+前端（Vue 3 + Vite）位于 `frontend/`，开发模式下由 Vite 将 `/api` 代理到
+`http://127.0.0.1:8000`：
+
+```powershell
+cd D:\employee_attendance\frontend
+npm install
+npm run dev          # http://127.0.0.1:5173
+npm run build        # 生成 frontend/dist，由 FastAPI 托管
+```
 
 ## 启动步骤
 
@@ -74,4 +89,8 @@ cd backend
 
 访问 `http://127.0.0.1:8000/health` 验证服务。
 
-访问 `http://127.0.0.1:8000/` 打开 Web 管理台，使用上方演示账号登录。
+访问 `http://127.0.0.1:8000/` 打开 Vue 管理台，使用上方演示账号登录。
+若提示“前端尚未构建”，先在 `frontend/` 执行 `npm run build`。
+
+开发模式仍可单独运行 Vite（`npm run dev`）访问 `http://127.0.0.1:5173`，
+改动会热更新，`/api` 自动代理到 8000 的后端。

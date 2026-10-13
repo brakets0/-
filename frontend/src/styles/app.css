@@ -368,6 +368,10 @@ button {
     transform: none;
 }
 
+.btn:disabled .btn-shine {
+    display: none;
+}
+
 .demo-accounts {
     margin-top: 26px;
     display: flex;

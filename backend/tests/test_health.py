@@ -1,27 +1,41 @@
-"""I1：后端健康检查接口测试（I4 后根路径返回 Web 管理台页面）。"""
+"""I1/I4/P4：健康检查、Vue 构建产物托管与 SPA 兜底。"""
+
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import FRONTEND_DIST, app
 
 
 client = TestClient(app)
 
 
-def test_root_returns_app_info():
+def test_root_serves_built_frontend():
     response = client.get("/")
     assert response.status_code == 200
-    assert "员工考勤" in response.text
+    assert "text/html" in response.headers.get("content-type", "")
+    assert '<div id="app">' in response.text
+
+
+def test_built_asset_is_served():
+    asset_dir = FRONTEND_DIST / "assets"
+    files = sorted(asset_dir.glob("*.js")) if asset_dir.is_dir() else []
+    if not files:
+        raise AssertionError("未找到 frontend/dist 构建产物，请先执行 npm run build")
+    response = client.get(f"/assets/{files[0].name}")
+    assert response.status_code == 200
+
+
+def test_spa_deep_link_falls_back_to_index():
+    response = client.get("/reports")
+    assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
 
 
-def test_static_assets_are_served():
-    css = client.get("/styles.css")
-    js = client.get("/app.js")
-    assert css.status_code == 200
-    assert "backdrop-filter" in css.text
-    assert js.status_code == 200
-    assert "login" in js.text
+def test_unknown_api_path_returns_json_404():
+    response = client.get("/api/definitely-missing")
+    assert response.status_code == 404
+    assert response.headers.get("content-type", "").startswith("application/json")
 
 
 def test_health_returns_ok():

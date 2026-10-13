@@ -1,0 +1,38 @@
+/*
+ * Element Plus 主题对齐：复用 app.css 中的霓虹配色变量，
+ * 让后续迁移进来的表单控件与现有深色玻璃拟态保持一致。
+ */
+:root {
+    --el-color-primary: #45e6ff;
+    --el-color-primary-light-3: rgba(69, 230, 255, 0.7);
+    --el-color-primary-light-5: rgba(69, 230, 255, 0.5);
+    --el-color-primary-light-7: rgba(69, 230, 255, 0.32);
+    --el-color-primary-light-8: rgba(69, 230, 255, 0.22);
+    --el-color-primary-light-9: rgba(69, 230, 255, 0.12);
+    --el-color-success: #38f2b4;
+    --el-color-success-light-3: rgba(56, 242, 180, 0.7);
+    --el-color-success-light-5: rgba(56, 242, 180, 0.5);
+    --el-color-success-light-7: rgba(56, 242, 180, 0.32);
+    --el-color-success-light-8: rgba(56, 242, 180, 0.22);
+    --el-color-success-light-9: rgba(56, 242, 180, 0.12);
+    --el-color-warning: #ffc857;
+    --el-color-warning-light-9: rgba(255, 200, 87, 0.12);
+    --el-color-danger: #ff5570;
+    --el-color-error: #ff5570;
+    --el-color-danger-light-9: rgba(255, 85, 112, 0.12);
+    --el-color-error-light-9: rgba(255, 85, 112, 0.12);
+    --el-color-info: #8b94ab;
+    --el-color-info-light-9: rgba(139, 148, 171, 0.12);
+    --el-bg-color: #0d1222;
+    --el-bg-color-overlay: #131a2e;
+    --el-text-color-primary: #eef4ff;
+    --el-text-color-regular: #c3ccdd;
+    --el-text-color-secondary: #8b94ab;
+    --el-border-color: rgba(255, 255, 255, 0.14);
+    --el-border-color-light: rgba(255, 255, 255, 0.1);
+    --el-border-color-lighter: rgba(255, 255, 255, 0.08);
+    --el-fill-color-blank: rgba(255, 255, 255, 0.04);
+    --el-fill-color-light: rgba(255, 255, 255, 0.06);
+    --el-mask-color: rgba(4, 6, 12, 0.72);
+    --el-border-radius-base: 10px;
+}

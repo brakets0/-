@@ -7,17 +7,24 @@
 - 本地 MySQL 8，不用 Docker；数据库与账号由 `backend/scripts/setup_db.py` 创建，表结构由 Alembic 迁移初始化。
 - 演示账号：`admin/admin123`（总管理员）、`manager/manager123`（部门管理员，技术部）、`employee/employee123`（普通员工）。
 - 后端虚拟环境：`D:\employee_attendance\backend\.venv`；PyCharm 打开后端项目时解释器应指向它。
-- Git 仓库：`D:\employee_attendance\.git`，当前分支 `master`；`.env`、`.venv/`、`.idea/`、缓存、`web/_screenshots/` 均不入库。
+- Git 仓库：`D:\employee_attendance\.git`，当前分支 `master`；`.env`、`.venv/`、`.idea/`、缓存、`web/_screenshots/`、`frontend/node_modules/`、`frontend/dist/`、`frontend/scripts/_screenshots/` 均不入库。
 
 ## 当前架构
 
 - `backend/app`：FastAPI 后端
-  - `routers/`：`auth.py`、`permissions.py`、`departments.py`、`employees.py`、`shifts.py`
+  - `routers/`：`auth.py`、`permissions.py`、`departments.py`、`employees.py`、`shifts.py`、`attendance.py`、`requests.py`、`reports.py`
+  - `services/attendance.py`：班次匹配、打卡状态刷新、月度汇总
+  - `services/reports.py`：按部门聚合月度考勤报表（出勤/缺勤/请假/外派）
   - `models/`：User、Department、Shift、Attendance、LeaveRequest、BusinessTrip
   - `services/working_time.py`：工时计算、工作日解析、打卡状态
   - `permissions.py`：三角色权限矩阵
   - `seed.py`：幂等演示数据
-- `web/`：深色霓虹 + 玻璃拟态 Web 管理台（`index.html`、`styles.css`、`app.js`）
+- `frontend/`：Vue 3 + Vite + Pinia + Element Plus 的前后端分离前端（`npm run dev` → `127.0.0.1:5173`）
+  - `src/api/`：axios 客户端（默认 baseURL `/api`）与各资源接口
+  - `src/stores/`：`auth`（登录态/权限）、`departments`（部门缓存）
+  - `src/router/`：路由与权限守卫，三角色菜单规则与旧版一致
+  - `src/views/`：`LoginView`、`DashboardView`（账号 + 今日出勤 + 本月概览真实统计）、`MyAttendanceView`、`AttendanceView`、`ApprovalView`、`EmployeesView`（含个人考勤抽屉）、`DepartmentsView`、`ShiftsView`、`ReportsView`
+- 旧版原生 `web/` 控制台已在 P4 下线；生产/演示态由 FastAPI 托管 `frontend/dist`（Vite 构建产物，不入库），根路径与 `/{path}` 走 SPA 兜底，`/api`、`/health`、`/docs` 保持原路由
 - 登录页品牌文案已改为「员工考勤系统 / employee attendance」；演示账号区暂时保留，待成品阶段确认是否移除。
 - `desktop/`、`docs/` 尚未创建
 
@@ -31,7 +38,7 @@
 - 部门管理员权限限定：只能查看/管理/分配本部门员工与考勤信息，前端已按本部门视角过滤
 - 员工登录默认进入「我的考勤」，不显示总管理工作台
 - 部门管理员登录后与员工一样显示「我的考勤」，本人参与部门考勤统计
-- 部门管理员/总管理员员工管理页有「个人考勤」抽屉弹窗（当前为演示数据）
+- 部门管理员/总管理员员工管理页有「个人考勤」抽屉弹窗，接入 `GET /api/attendance/employee/{id}?month=`，展示月度汇总与明细并支持切换月份
 - 总管理员不计入考勤统计：`app/permissions.py` 的 `is_attendance_subject(role)` 只允许 `employee`、`department_manager`
 - 前端侧边栏顺序：`我的考勤` 在顶部，`工作台` 在其后
 - 首次 Git 提交 `9a62c21 Initial commit: attendance I1-I4 with web console`（53 文件）
@@ -40,7 +47,24 @@
 - I4 收尾：考勤中心支持日期与部门筛选和演示汇总；审批中心支持类型/状态筛选、请假/外派申请及演示审批；报表中心支持月份/范围筛选与 CSV 导出。
 - I4 接口补充：`/auth/me` 返回 `department_name`，供前端按当前用户所属部门展示和过滤演示数据。
 - I4 响应式修复：移动端考勤表格保持单行并支持横向滚动，顶栏时间完整显示；员工、部门、班次页面重新加载时会清空部门缓存，避免 CRUD 后显示旧统计值。
-- 当前暂无独立桌面端或移动端客户端，统一使用 FastAPI 托管的响应式 Web 管理台；桌面浏览器访问 `127.0.0.1:8000`，手机可通过电脑局域网 IP 访问。
+- P0：搭建 `frontend/` Vue 3 脚手架，迁移登录页与应用外壳，登录 → `/auth/me` → 权限菜单全链路打通；旧 `web/` 未改动。
+- P1：业务接口统一加 `/api` 前缀（`backend/app/main.py` 的 `API_PREFIX`），CORS 收敛为显式放行 `127.0.0.1:5173` 且关闭 credentials；`web/app.js` 的 `API_BASE` 同步改为 `/api`；测试路径断言同步更新。
+- P2a：迁移员工管理、部门管理、班次管理三页到 Vue + Element Plus，保留原权限规则、部门缓存失效、移动端表格横向滚动；冒烟脚本 `frontend/scripts/smoke.py` 覆盖三角色登录/守卫与三页 CRUD。
+- I5a：新增 `/api/attendance/punch`（签到/签退，重复打卡 409）、`/api/attendance/me`、`/api/attendance?date=&department_id=`（按日期出勤对账）、`/api/attendance/employee/{id}`；「我的考勤」页已接入真实数据与打卡按钮。出勤率 = 打卡完整天数 / 应出勤天数（迟到、早退仍计出勤）。
+- I5a 续：「考勤中心」已接入 `/api/attendance`，支持日期/部门筛选与出勤汇总。
+- I5b（后端已完成）：`POST/GET /api/leave-requests`、`PATCH /api/leave-requests/{id}/review`、`POST/GET /api/business-trips`、`PATCH /api/business-trips/{id}/review`；列表范围=本人/本部门/全部，审批需 `*.review.department`，越权 403、重复审批 409。测试文件 `backend/tests/test_requests.py`（5 用例）。
+- I5b 补齐：新增 `DELETE /api/leave-requests/{id}`、`DELETE /api/business-trips/{id}`（员工撤回本人待审批申请，审批人可删除范围内申请）；「审批中心」向拥有 `leave.apply` 的角色开放，普通员工可提交并查看本人申请、撤回待审批记录，审批人保留通过/驳回。测试新增 `test_delete_leave_scope_and_pending_rule`，`test_requests.py` 共 6 用例。
+- I5c：新增 `GET /api/reports/monthly`（`month=YYYY-MM`、可选 `department_id`），按部门聚合应出勤、出勤、迟到、早退、缺勤、平均工时、平均出勤率、请假/外派天数；部门管理员锁定本部门，总管理员可全公司或按部门下钻，员工无部门级报表权限。Vue「报表中心」接入真实数据、部门筛选、汇总卡片与带 BOM 的 CSV 导出。测试 `backend/tests/test_reports.py`（3 用例）。
+- P4：删除旧 `web/` 控制台（`web/app.js`、`index.html`、`styles.css`），FastAPI 改用 `FRONTEND_DIST = frontend/dist` 托管：`/assets/{path}` 返回构建资源，`/` 与 `/{path}` SPA 兜底，未匹配的 `/api/*` 明确返回 JSON 404；`dist` 未构建时返回 404 并提示 `npm run build`。`backend/tests/test_health.py` 改为断言构建入口、构建资源、`/reports` 深链接与 `/api` 404。
+- 遗留文件安全清理：删除已无引用的 `frontend/src/views/PlaceholderView.vue` 与冒烟调试用的 `frontend/scripts/_debug_requests.py`；`DashboardView` 工作台统计、员工个人考勤抽屉仍按主方案后续迭代，不在清理范围内。
+- P5（收尾）：工作台 `DashboardView` 接入真实统计（账号信息 + 今日出勤 + 本月概览 + 待审批，数据源 `/api/departments`、`/api/employees`、`/api/attendance`、`/api/reports/monthly`、请假/外派列表），移除“P2 迁移阶段”占位文案；员工管理页「个人考勤」抽屉接入 `/api/attendance/employee/{id}`，含月度汇总、明细与月份切换。冒烟脚本新增工作台真实统计与抽屉检查。
+
+## 待办交接（下一轮从这里开始）
+
+- I5b 已完成并端到端验证：`frontend/scripts/smoke.py` 新增审批链路检查（普通员工提交申请 + 列表可见，部门管理员可见本部门申请并审批通过，断言状态与审批人、已处理行无审批按钮），三个账号检查块均改用独立上下文并在 `login()` 前清空 localStorage，冒烟脚本可重复运行。审批日期控件改为两个独立 `el-date-picker`，避免 `daterange` 直接填值产生 `Invalid user input` / 事由丢失问题。
+- I5c 已完成：报表接口与「报表中心」页面见上，`frontend/scripts/smoke.py` 覆盖总管理员导出 CSV、部门管理员只看本部门。
+- P4 已完成：旧 `web/` 下线，FastAPI 托管 `frontend/dist`；开发态仍用 Vite 5173（`/api` 代理 8000），生产/演示态访问 `127.0.0.1:8000`。
+- 收尾习惯：每轮结束跑完整 `pytest -q`（当前累计 75 用例）、`npm run build`、`python frontend/scripts/smoke.py`，再同步本文件。
 
 ## 权限模型
 
@@ -64,16 +88,24 @@
 
 ```powershell
 cd D:\employee_attendance\backend
-.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 53 passed）
+.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 75 passed）
 .\.venv\Scripts\python.exe -m scripts.setup_db    # 创建数据库与账号
 .\.venv\Scripts\python.exe -m scripts.init_db     # 执行迁移并写入演示数据
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 node --check D:\employee_attendance\web\app.js    # 前端语法检查
+
+cd D:\employee_attendance\frontend
+npm install
+npm run dev                                       # Vue 开发服务器 127.0.0.1:5173
+npm run build                                     # 生产构建到 frontend/dist
+python D:\employee_attendance\frontend\scripts\smoke.py   # 浏览器冒烟（需后端+前端已启动）
 ```
 
 ## 当前状态
 
-- Web 端页面多为演示样式数据，业务 API 尚未全部联调（组织/员工/班次 CRUD 已有接口）
-- 后端测试 `53 passed, 3 warnings`
-- I4 收尾提交信息为 `Complete I4 console workflows and responsive fixes`，包含考勤/审批/报表演示流程、移动端修复与部门缓存失效处理
-- 下一步进入 I5：实现打卡、请假、外派、报表等业务路由，并让前端逐步对接真实数据
+- Vue 前端已接管登录、工作台（真实统计）、我的考勤、考勤中心、审批中心、员工管理（含个人考勤抽屉）、部门管理、班次管理、报表中心
+- 考勤接口（I5a）、请假/外派接口（I5b）、报表接口（I5c）均已就绪并端到端验证
+- 后端测试 `75 passed, 3 warnings`
+- 演示库中已有 1 条 2026-10-13 的 employee 打卡记录（冒烟脚本真实打卡产生）
+- 最近一次提交为 `2daae3a Complete I4 console workflows and responsive fixes`；P0/P1/P2a/I5a/I5b/I5c/P4/P5 改动尚未提交
+- 下一步：按需补桌面端（`desktop/`）、人脸识别接入与部署文档；当前 API + Web 管理台已达可演示状态
