@@ -21,5 +21,6 @@ Thumbs.db
 logs/
 backend/.uvicorn*.log
 backend/.smoke-out.txt
+desktop/scripts/_screenshots/
 tests/.pytest_cache/
 .pytest_cache/

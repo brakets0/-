@@ -123,6 +123,7 @@ class EmployeeOut(BaseModel):
     department_id: int | None = None
     department_name: str | None = None
     status: str
+    face_registered: bool = False
     created_at: datetime
 
 

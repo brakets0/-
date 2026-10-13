@@ -22,6 +22,13 @@ class Settings:
         # 百度 AI 人脸 API
         self.baidu_face_ak = os.getenv("BAIDU_FACE_AK", "")
         self.baidu_face_sk = os.getenv("BAIDU_FACE_SK", "")
+        self.baidu_face_app_id = os.getenv("BAIDU_FACE_APP_ID", "")
+        self.baidu_face_group = os.getenv(
+            "BAIDU_FACE_GROUP", "employee_attendance"
+        )
+        self.baidu_face_score_threshold = int(
+            os.getenv("BAIDU_FACE_SCORE_THRESHOLD", "80")
+        )
 
         # JWT（I3 使用）
         self.secret_key = os.getenv(

@@ -29,6 +29,10 @@ class User(Base):
     status: Mapped[str] = mapped_column(
         String(20), default="active", server_default="active", nullable=False
     )
+    face_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    face_registered_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     department = relationship("Department", back_populates="employees")
@@ -37,3 +41,8 @@ class User(Base):
     def department_name(self) -> str | None:
         """供账号资料接口直接返回所属部门名称。"""
         return self.department.name if self.department else None
+
+    @property
+    def face_registered(self) -> bool:
+        """是否已完成人脸注册（仅供前端展示绑定状态）。"""
+        return bool(self.face_token)

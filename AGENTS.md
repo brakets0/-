@@ -12,9 +12,11 @@
 ## 当前架构
 
 - `backend/app`：FastAPI 后端
-  - `routers/`：`auth.py`、`permissions.py`、`departments.py`、`employees.py`、`shifts.py`、`attendance.py`、`requests.py`、`reports.py`
+  - `routers/`：`auth.py`、`permissions.py`、`departments.py`、`employees.py`、`shifts.py`、`attendance.py`、`requests.py`、`reports.py`、`face.py`
   - `services/attendance.py`：班次匹配、打卡状态刷新、月度汇总
   - `services/reports.py`：按部门聚合月度考勤报表（出勤/缺勤/请假/外派）
+  - `services/baidu_face.py`：百度云人脸 REST 客户端（access_token、检测、注册、检索）
+  - `services/face_service.py`：人脸注册权限、绑定状态与人脸检索业务编排
   - `models/`：User、Department、Shift、Attendance、LeaveRequest、BusinessTrip
   - `services/working_time.py`：工时计算、工作日解析、打卡状态
   - `permissions.py`：三角色权限矩阵
@@ -26,7 +28,8 @@
   - `src/views/`：`LoginView`、`DashboardView`（账号 + 今日出勤 + 本月概览真实统计）、`MyAttendanceView`、`AttendanceView`、`ApprovalView`、`EmployeesView`（含个人考勤抽屉）、`DepartmentsView`、`ShiftsView`、`ReportsView`
 - 旧版原生 `web/` 控制台已在 P4 下线；生产/演示态由 FastAPI 托管 `frontend/dist`（Vite 构建产物，不入库），根路径与 `/{path}` 走 SPA 兜底，`/api`、`/health`、`/docs` 保持原路由
 - 登录页品牌文案已改为「员工考勤系统 / employee attendance」；演示账号区暂时保留，待成品阶段确认是否移除。
-- `desktop/`、`docs/` 尚未创建
+- `desktop/`：wxPython 员工桌面端（登录、人脸注册、人脸签到/签退），摄像头只抓帧，识别全部走后端调用百度云
+- `docs/` 尚未创建
 
 ## 已完成
 
@@ -58,13 +61,15 @@
 - P4：删除旧 `web/` 控制台（`web/app.js`、`index.html`、`styles.css`），FastAPI 改用 `FRONTEND_DIST = frontend/dist` 托管：`/assets/{path}` 返回构建资源，`/` 与 `/{path}` SPA 兜底，未匹配的 `/api/*` 明确返回 JSON 404；`dist` 未构建时返回 404 并提示 `npm run build`。`backend/tests/test_health.py` 改为断言构建入口、构建资源、`/reports` 深链接与 `/api` 404。
 - 遗留文件安全清理：删除已无引用的 `frontend/src/views/PlaceholderView.vue` 与冒烟调试用的 `frontend/scripts/_debug_requests.py`；`DashboardView` 工作台统计、员工个人考勤抽屉仍按主方案后续迭代，不在清理范围内。
 - P5（收尾）：工作台 `DashboardView` 接入真实统计（账号信息 + 今日出勤 + 本月概览 + 待审批，数据源 `/api/departments`、`/api/employees`、`/api/attendance`、`/api/reports/monthly`、请假/外派列表），移除“P2 迁移阶段”占位文案；员工管理页「个人考勤」抽屉接入 `/api/attendance/employee/{id}`，含月度汇总、明细与月份切换。冒烟脚本新增工作台真实统计与抽屉检查。
+- I6（人脸 + 桌面端）：新增百度云人脸 REST 客户端与 `POST /api/face/register`、`GET /api/face/me`、`POST /api/face/attendance`；`users` 表新增 `face_token`、`face_registered_at`（迁移 `0002_user_face_token`）。注册/换绑只给部门管理员（本部门）与总管理员，员工只能查询状态和刷脸打卡；人脸命中后复用 `attendance.punch` 写考勤。桌面端 `desktop/` 使用 wxPython，`desktop/scripts/build_check.py` 可在无摄像头环境渲染自检。测试 `backend/tests/test_face.py`（10 用例，百度客户端用 fake）。
+- I6 真实联调已完成：百度服务开通后，真实人脸检测、注册、检索全部成功；`scripts/e2e_face_demo.py` 走真实 API 完成「管理员代注册 → 员工刷脸签到」，注册 200、打卡 200（相似度 99.9986）。演示库中 E00001 已绑定测试人像（公共测试照片，可通过重新注册换绑），仅用于验证链路。
 
 ## 待办交接（下一轮从这里开始）
 
 - I5b 已完成并端到端验证：`frontend/scripts/smoke.py` 新增审批链路检查（普通员工提交申请 + 列表可见，部门管理员可见本部门申请并审批通过，断言状态与审批人、已处理行无审批按钮），三个账号检查块均改用独立上下文并在 `login()` 前清空 localStorage，冒烟脚本可重复运行。审批日期控件改为两个独立 `el-date-picker`，避免 `daterange` 直接填值产生 `Invalid user input` / 事由丢失问题。
 - I5c 已完成：报表接口与「报表中心」页面见上，`frontend/scripts/smoke.py` 覆盖总管理员导出 CSV、部门管理员只看本部门。
 - P4 已完成：旧 `web/` 下线，FastAPI 托管 `frontend/dist`；开发态仍用 Vite 5173（`/api` 代理 8000），生产/演示态访问 `127.0.0.1:8000`。
-- 收尾习惯：每轮结束跑完整 `pytest -q`（当前累计 75 用例）、`npm run build`、`python frontend/scripts/smoke.py`，再同步本文件。
+- 收尾习惯：每轮结束跑完整 `pytest -q`（当前累计 85 用例）、`npm run build`、`python frontend/scripts/smoke.py`，再同步本文件。
 
 ## 权限模型
 
@@ -88,7 +93,7 @@
 
 ```powershell
 cd D:\employee_attendance\backend
-.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 75 passed）
+.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 85 passed）
 .\.venv\Scripts\python.exe -m scripts.setup_db    # 创建数据库与账号
 .\.venv\Scripts\python.exe -m scripts.init_db     # 执行迁移并写入演示数据
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -99,13 +104,20 @@ npm install
 npm run dev                                       # Vue 开发服务器 127.0.0.1:5173
 npm run build                                     # 生产构建到 frontend/dist
 python D:\employee_attendance\frontend\scripts\smoke.py   # 浏览器冒烟（需后端+前端已启动）
+
+cd D:\employee_attendance\desktop
+python main.py                                    # wxPython 桌面端
+python D:\employee_attendance\desktop\scripts\build_check.py  # 桌面端渲染自检
+.\.venv\Scripts\python.exe -m scripts.probe_baidu_face        # 百度人脸接口连通性（在 backend 下）
 ```
 
 ## 当前状态
 
 - Vue 前端已接管登录、工作台（真实统计）、我的考勤、考勤中心、审批中心、员工管理（含个人考勤抽屉）、部门管理、班次管理、报表中心
 - 考勤接口（I5a）、请假/外派接口（I5b）、报表接口（I5c）均已就绪并端到端验证
-- 后端测试 `75 passed, 3 warnings`
+- 人脸接口（I6）已就绪：注册/换绑限部门管理员与总管理员，员工可查询绑定状态并刷脸打卡；百度 REST 客户端支持 token 缓存与错误码映射
+- 桌面端 `desktop/` 已可运行：登录、人脸注册、人脸签到/签退、无摄像头自检；人脸识别全部由后端调用百度云
+- 后端测试 `85 passed, 3 warnings`
 - 演示库中已有 1 条 2026-10-13 的 employee 打卡记录（冒烟脚本真实打卡产生）
-- 最近一次提交为 `2daae3a Complete I4 console workflows and responsive fixes`；P0/P1/P2a/I5a/I5b/I5c/P4/P5 改动尚未提交
-- 下一步：按需补桌面端（`desktop/`）、人脸识别接入与部署文档；当前 API + Web 管理台已达可演示状态
+- 最近一次提交为 `42e540e Migrate console to Vue 3 with I5 business APIs`；I6 人脸与桌面端改动尚未提交
+- 待办：`docs/` 部署文档尚未创建；若需换绑或清除 E00001 的测试人像，用管理员在桌面端重新采集，或调用 `face/register` / 百度 faceset 接口删除

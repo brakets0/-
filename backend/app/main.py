@@ -20,6 +20,7 @@ from app.routers import (
     auth,
     departments,
     employees,
+    face,
     permissions,
     reports,
     requests,
@@ -67,6 +68,7 @@ app.include_router(attendance.router, prefix=API_PREFIX)
 app.include_router(requests.leave_router, prefix=API_PREFIX)
 app.include_router(requests.trip_router, prefix=API_PREFIX)
 app.include_router(reports.router, prefix=API_PREFIX)
+app.include_router(face.router, prefix=API_PREFIX)
 
 
 # P4：前端构建产物由 FastAPI 托管，开发态仍由 Vite 提供。

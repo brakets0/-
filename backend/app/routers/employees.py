@@ -30,6 +30,7 @@ def _employee_out(user: User) -> EmployeeOut:
         department_id=user.department_id,
         department_name=department.name if department else None,
         status=user.status,
+        face_registered=user.face_registered,
         created_at=user.created_at,
     )
 
