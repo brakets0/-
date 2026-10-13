@@ -53,7 +53,7 @@ async function submit() {
                     </div>
                 </div>
                 <p class="brand-copy">
-                    深色霓虹视觉 · 部门与总管理员双入口 · 人脸打卡与智能报表同步协同
+                    部门与总管理员双入口 · 人脸识别打卡 · 审批与月度报表协同管理
                 </p>
                 <div class="login-stats">
                     <span>实时考勤</span><span>智能审批</span><span>月度报表</span>

@@ -73,13 +73,17 @@ def run() -> int:
         panel._on_login(None)
         wx.CallLater(1500, check_main)
 
-    def on_ready(_frame):
+    def capture_login():
         panel = current_panel(frame)
         if isinstance(panel, LoginPanel):
             shoot(frame, "login.png")
         else:
             ERRORS.append("启动后未显示登录面板")
         wx.CallLater(300, do_login)
+
+    def on_ready(_frame):
+        # 等首帧绘制完成再截图，避免自绘控件还是空白
+        wx.CallLater(700, capture_login)
 
     frame.on_ready = on_ready
     wx.CallAfter(on_ready, frame)

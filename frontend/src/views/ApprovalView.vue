@@ -374,9 +374,6 @@ onBeforeUnmount(() => {
         </el-form>
 
         <template #footer>
-            <button class="btn btn-ghost" type="button" @click="dialogVisible = false">
-                取消
-            </button>
             <button
                 class="btn btn-primary"
                 type="button"
@@ -385,6 +382,9 @@ onBeforeUnmount(() => {
             >
                 <span>提交申请</span>
                 <span class="btn-shine"></span>
+            </button>
+            <button class="btn btn-ghost" type="button" @click="dialogVisible = false">
+                取消
             </button>
         </template>
     </el-dialog>

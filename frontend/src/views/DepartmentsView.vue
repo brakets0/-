@@ -298,9 +298,6 @@ onBeforeUnmount(() => {
         </el-form>
 
         <template #footer>
-            <button class="btn btn-ghost" type="button" @click="dialogVisible = false">
-                取消
-            </button>
             <button
                 class="btn btn-primary"
                 type="button"
@@ -309,6 +306,9 @@ onBeforeUnmount(() => {
             >
                 <span>{{ editingId ? "保存修改" : "创建部门" }}</span>
                 <span class="btn-shine"></span>
+            </button>
+            <button class="btn btn-ghost" type="button" @click="dialogVisible = false">
+                取消
             </button>
         </template>
     </el-dialog>
@@ -338,9 +338,6 @@ onBeforeUnmount(() => {
         </el-form>
 
         <template #footer>
-            <button class="btn btn-ghost" type="button" @click="assignVisible = false">
-                取消
-            </button>
             <button
                 class="btn btn-primary"
                 type="button"
@@ -349,6 +346,9 @@ onBeforeUnmount(() => {
             >
                 <span>保存指派</span>
                 <span class="btn-shine"></span>
+            </button>
+            <button class="btn btn-ghost" type="button" @click="assignVisible = false">
+                取消
             </button>
         </template>
     </el-dialog>
