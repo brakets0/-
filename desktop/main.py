@@ -60,6 +60,7 @@ def text_label(parent, label: str, *, size=10, bold=False, colour=TEXT) -> wx.St
     widget = wx.StaticText(parent, label=label)
     widget.SetForegroundColour(colour)
     widget.SetFont(make_font(size, bold=bold))
+    widget.InvalidateBestSize()
     return widget
 
 
@@ -373,7 +374,7 @@ class MainPanel(wx.Panel):
         sizer.Add(logout, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 10)
 
         header.SetSizer(sizer)
-        header.SetMinSize((-1, 72))
+        header.SetMinSize((-1, self.FromDIP(84)))
         return header
 
     def _build_body(self):

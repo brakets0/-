@@ -4,6 +4,7 @@
 
 - 企业员工人脸识别考勤系统（毕设），基于百度云人脸识别 + FastAPI + MySQL 8 + Web 管理台。
 - 项目根：`D:\employee_attendance`
+- 当前发布版本：`v1.0`（应用版本 `1.0.0`，Git 标签 `v1.0`）
 - 本地 MySQL 8，不用 Docker；数据库与账号由 `backend/scripts/setup_db.py` 创建，表结构由 Alembic 迁移初始化。
 - 演示账号：`admin/admin123`（总管理员）、`manager/manager123`（部门管理员，技术部）、`employee/employee123`（普通员工）。
 - 后端虚拟环境：`D:\employee_attendance\backend\.venv`；PyCharm 打开后端项目时解释器应指向它。
@@ -63,16 +64,19 @@
 - 前端样式修复：侧边栏 `.nav-item` 增加 `text-decoration: none` 去掉菜单下划线；新增全局 `.el-dialog__footer` 弹性布局，取消/保存按钮同一行、统一 120×44（移动端两按钮等宽同行），覆盖员工/部门/指派/班次/审批 5 个弹窗。
 - 前端主题重构（浅色企业风）：`app.css` 重写设计 token（背景 `#F5F6F8`、卡片 `#FFFFFF`、边框 `#E4E6EE`、主色 `#5F7A99`、辅助 `#7FA8A0`/`#D9A76A`、侧边栏 `#2A3446`）并清理旧控制台遗留样式；`element-theme.css` 同步 Element Plus 浅色变量与表格/弹窗/表单覆盖；`index.html` 去掉 `class="dark"` 与霓虹装饰层，`main.js` 移除 dark css-vars。组件统一补充 hover 过渡（按钮上浮+阴影、导航位移+高亮、卡片上浮、图标按钮、账号 chip、输入框边框/聚焦环）。移动端（≤960px）侧边栏改为紧凑吸顶横排导航。弹窗底部按钮顺序调整为「保存在前、取消在后」，仍保持同一行且尺寸一致。参考原型 `frontend/public/prototype.html` 已按用户确认删除。
 - 桌面端同步浅色企业风：`desktop/main.py` 改用同一套色板（`#F5F6F8`/`#FFFFFF`/`#E4E6EE`/`#5F7A99`），新增自绘组件 `CardPanel`（圆角白卡片）、`BrandMark`、`HoverButton`（主色/次要样式 + 悬停变色、边框高亮、上浮阴影、禁用态）、`PreviewPanel`（浅灰底细边框）。`desktop/scripts/build_check.py` 增加首帧等待，避免自绘控件截图空白。
+- 桌面端头部修复：`text_label()` 设置字体后刷新最佳尺寸，用户信息卡改为 DPI 感知最小高度，修复左上角工号、部门下半部分被裁切的问题。
 - P5（收尾）：工作台 `DashboardView` 接入真实统计（账号信息 + 今日出勤 + 本月概览 + 待审批，数据源 `/api/departments`、`/api/employees`、`/api/attendance`、`/api/reports/monthly`、请假/外派列表），移除“P2 迁移阶段”占位文案；员工管理页「个人考勤」抽屉接入 `/api/attendance/employee/{id}`，含月度汇总、明细与月份切换。冒烟脚本新增工作台真实统计与抽屉检查。
 - I6（人脸 + 桌面端）：新增百度云人脸 REST 客户端与 `POST /api/face/register`、`GET /api/face/me`、`POST /api/face/attendance`；`users` 表新增 `face_token`、`face_registered_at`（迁移 `0002_user_face_token`）。注册/换绑只给部门管理员（本部门）与总管理员，员工只能查询状态和刷脸打卡；人脸命中后复用 `attendance.punch` 写考勤。桌面端 `desktop/` 使用 wxPython，`desktop/scripts/build_check.py` 可在无摄像头环境渲染自检。测试 `backend/tests/test_face.py`（10 用例，百度客户端用 fake）。
 - I6 真实联调已完成：百度服务开通后，真实人脸检测、注册、检索全部成功；`scripts/e2e_face_demo.py` 走真实 API 完成「管理员代注册 → 员工刷脸签到」，注册 200、打卡 200（相似度 99.9986）。演示库中 E00001 已绑定测试人像（公共测试照片，可通过重新注册换绑），仅用于验证链路。
+- v1.0 收尾：后端应用版本和 `/health` 版本统一为 `1.0.0`，前端 `package.json` / `package-lock.json` 同步为 `1.0.0`；README 与项目记忆记录 v1.0 发布信息。
+- v1.0 测试脚本稳定性修复：浏览器冒烟等待 `/login` 路径和 CRUD 刷新结果，不依赖历史月份考勤记录；重复执行打卡时会先查询当天状态，避免预期 409 被误报。
 
 ## 待办交接（下一轮从这里开始）
 
-- I5b 已完成并端到端验证：`frontend/scripts/smoke.py` 新增审批链路检查（普通员工提交申请 + 列表可见，部门管理员可见本部门申请并审批通过，断言状态与审批人、已处理行无审批按钮），三个账号检查块均改用独立上下文并在 `login()` 前清空 localStorage，冒烟脚本可重复运行。审批日期控件改为两个独立 `el-date-picker`，避免 `daterange` 直接填值产生 `Invalid user input` / 事由丢失问题。
-- I5c 已完成：报表接口与「报表中心」页面见上，`frontend/scripts/smoke.py` 覆盖总管理员导出 CSV、部门管理员只看本部门。
-- P4 已完成：旧 `web/` 下线，FastAPI 托管 `frontend/dist`；开发态仍用 Vite 5173（`/api` 代理 8000），生产/演示态访问 `127.0.0.1:8000`。
-- 收尾习惯：每轮结束跑完整 `pytest -q`（当前累计 85 用例）、`npm run build`、`python frontend/scripts/smoke.py`，再同步本文件。
+- I1-I6 主开发周期已完成，P0-P5 前端迁移与整合已完成，当前为 v1.0 交付版本。
+- 自动化验证基线：后端 `85 passed, 3 warnings`；`npm run build` 通过但有单个 JS chunk 超过 500 kB 的非阻断警告；浏览器冒烟、桌面端自检、百度云连通性检查通过。
+- 可选交付增强：创建 `docs/` 部署与操作文档；清理演示库测试打卡或 E00001 测试人像；按最终答辩要求补充截图与论文材料。
+- 收尾习惯：后续每轮结束跑完整 `pytest -q`、`npm run build`、`python frontend/scripts/smoke.py`，再同步本文件。
 
 ## 权限模型
 
@@ -96,7 +100,7 @@
 
 ```powershell
 cd D:\employee_attendance\backend
-.\.venv\Scripts\python.exe -m pytest -q           # 测试（当前 85 passed）
+.\.venv\Scripts\python.exe -m pytest -q           # 测试（v1.0 基线 85 passed）
 .\.venv\Scripts\python.exe -m scripts.setup_db    # 创建数据库与账号
 .\.venv\Scripts\python.exe -m scripts.init_db     # 执行迁移并写入演示数据
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -116,11 +120,11 @@ python D:\employee_attendance\desktop\scripts\build_check.py  # 桌面端渲染�
 
 ## 当前状态
 
+- 当前版本为 v1.0，应用版本 `1.0.0`，Git 标签 `v1.0`。
 - Vue 前端已接管登录、工作台（真实统计）、我的考勤、考勤中心、审批中心、员工管理（含个人考勤抽屉）、部门管理、班次管理、报表中心
 - 考勤接口（I5a）、请假/外派接口（I5b）、报表接口（I5c）均已就绪并端到端验证
 - 人脸接口（I6）已就绪：注册/换绑限部门管理员与总管理员，员工可查询绑定状态并刷脸打卡；百度 REST 客户端支持 token 缓存与错误码映射
 - 桌面端 `desktop/` 已可运行：登录、人脸注册、人脸签到/签退、无摄像头自检；人脸识别全部由后端调用百度云
-- 后端测试 `85 passed, 3 warnings`
-- 演示库中已有 1 条 2026-10-13 的 employee 打卡记录（冒烟脚本真实打卡产生）
-- 最近一次提交为 `42e540e Migrate console to Vue 3 with I5 business APIs`；I6 人脸与桌面端改动尚未提交
-- 待办：`docs/` 部署文档尚未创建；若需换绑或清除 E00001 的测试人像，用管理员在桌面端重新采集，或调用 `face/register` / 百度 faceset 接口删除
+- 后端测试 `85 passed, 3 warnings`；前端生产构建、浏览器冒烟、桌面端自检与百度云连通性检查均通过
+- 演示库中保留测试打卡记录，E00001 保留公共测试人像；正式演示前可用管理员桌面端重新注册换绑
+- 主开发周期与 v1.0 版本记录已完成；`docs/` 详细部署文档和答辩材料仍为可选收尾项

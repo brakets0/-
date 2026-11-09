@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from app import __version__
 from app import models  # noqa: F401
 from app.database import Base
 from app.config import settings
@@ -31,7 +32,7 @@ from app.routers import (
 app = FastAPI(
     title="企业员工人脸考勤系统 API",
     description="员工桌面端与 Web 管理台共用的后端服务。",
-    version="0.1.0",
+    version=__version__,
 )
 
 # 前后端分离后仅放行本地 Vite 开发源；使用 Bearer 令牌，无需携带 Cookie。
@@ -100,6 +101,7 @@ def _spa_index() -> FileResponse:
 def health():
     """健康检查：确认应用、模型加载与百度密钥配置状态。"""
     return {
+        "version": __version__,
         "status": "ok",
         "models_loaded": len(Base.metadata.tables),
         "baidu_face_ak_set": bool(settings.baidu_face_ak),

@@ -172,6 +172,60 @@ def api_delete(page, path):
     )
 
 
+def ensure_employee_punch(page):
+    """确保 E00001 在当前月有真实考勤记录，供管理员页面断言。"""
+    page.evaluate(
+        """
+        async () => {
+            const loginResponse = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "employee",
+                    password: "employee123",
+                }),
+            });
+            if (!loginResponse.ok) {
+                throw new Error(`employee login failed: ${loginResponse.status}`);
+            }
+            const session = await loginResponse.json();
+            const headers = {
+                Authorization: `Bearer ${session.access_token}`,
+            };
+            const attendanceResponse = await fetch("/api/attendance/me", {
+                headers,
+            });
+            if (!attendanceResponse.ok) {
+                throw new Error(
+                    `employee attendance failed: ${attendanceResponse.status}`
+                );
+            }
+            const attendance = await attendanceResponse.json();
+            const now = new Date();
+            const today = [
+                now.getFullYear(),
+                String(now.getMonth() + 1).padStart(2, "0"),
+                String(now.getDate()).padStart(2, "0"),
+            ].join("-");
+            if (attendance.records.some((item) => item.work_date === today)) {
+                return;
+            }
+            const punchResponse = await fetch("/api/attendance/punch", {
+                method: "POST",
+                headers: {
+                    ...headers,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ punch_type: "in" }),
+            });
+            if (punchResponse.status !== 200) {
+                throw new Error(`employee punch failed: ${punchResponse.status}`);
+            }
+        }
+        """
+    )
+
+
 def api_create_leave_as(
     page,
     username,
@@ -262,7 +316,16 @@ def run_admin_checks(browser, errors):
     attach_diagnostics(page, "admin", errors)
 
     page.goto(f"{BASE_URL}/", wait_until="networkidle")
-    assert "/login" in page.url, page.url
+    try:
+        page.wait_for_function(
+            "() => window.location.pathname === '/login'",
+            timeout=10000,
+        )
+    except Exception as exc:
+        diagnostic = "; ".join(errors) or "无控制台/网络错误"
+        raise AssertionError(
+            f"未跳转登录页，当前地址 {page.url}；诊断：{diagnostic}"
+        ) from exc
 
     login(page, "admin", "admin123")
     page.wait_for_url("**/dashboard")
@@ -330,6 +393,7 @@ def run_admin_checks(browser, errors):
 
     row = employee_row(page, SMOKE_EMPLOYEE["employee_no"])
     row.wait_for(timeout=10000)
+    row.get_by_text("冒烟员工改", exact=True).wait_for(timeout=10000)
     assert "冒烟员工改" in row.inner_text()
 
     page.screenshot(path=str(SCREENSHOT_DIR / "p2-employees-desktop.png"), full_page=True)
@@ -344,6 +408,7 @@ def run_admin_checks(browser, errors):
     assert employee_row(page, SMOKE_EMPLOYEE["employee_no"]).count() == 0
 
     # 个人考勤抽屉：真实 /api/attendance/employee/{id} 数据
+    ensure_employee_punch(page)
     worker_row = employee_row(page, "E00001")
     worker_row.wait_for(timeout=10000)
     worker_row.get_by_role("button", name="个人考勤").click()
@@ -466,6 +531,23 @@ def run_admin_checks(browser, errors):
 
     row = shift_row(page, SMOKE_SHIFT_DATE)
     row.wait_for(timeout=10000)
+    page.wait_for_function(
+        """
+        ([date, expected, unexpected]) => {
+            const rows = Array.from(
+                document.querySelectorAll(".shift-table .el-table__row")
+            );
+            const target = rows.find((item) => item.innerText.includes(date));
+            return Boolean(
+                target &&
+                target.innerText.includes(expected) &&
+                !target.innerText.includes(unexpected)
+            );
+        }
+        """,
+        arg=[SMOKE_SHIFT_DATE, "周四", "周五"],
+        timeout=10000,
+    )
     assert "周五" not in row.inner_text(), row.inner_text()
     assert "周四" in row.inner_text()
 

@@ -2,6 +2,8 @@
 
 基于百度云人脸识别 + FastAPI + MySQL + wxPython 的 C/S 双端考勤系统。
 
+当前版本：**v1.0**（应用版本 `1.0.0`）
+
 ## 数据库方式
 
 项目直接连接**本机 MySQL 8**，不使用容器：
@@ -35,7 +37,9 @@ employee_attendance/
   登录、权限菜单、员工/部门/班次页面完成迁移。
 - I5：考勤打卡、我的考勤、考勤中心、请假/外派审批、月度报表（含 CSV 导出）接口与页面。
 - P4：下线旧原生控制台，FastAPI 直接托管 `frontend/dist`，前端路由深链接由 SPA 兜底。
-- 后端测试：健康检查、模型约束、迁移 SQL、种子、工时函数。
+- I6：百度云人脸检测、注册、换绑、刷脸签到签退，以及 wxPython 桌面端。
+- v1.0：完成浅色企业风重构、桌面端布局修复、全量回归验证与版本标记。
+- 自动化验证：后端 `85 passed`，前端生产构建、浏览器冒烟、桌面端自检和百度云连通性检查通过。
 
 ## 演示账号
 
@@ -94,3 +98,19 @@ cd backend
 
 开发模式仍可单独运行 Vite（`npm run dev`）访问 `http://127.0.0.1:5173`，
 改动会热更新，`/api` 自动代理到 8000 的后端。
+
+### 4. 启动桌面端
+
+桌面端仅负责摄像头抓帧与上传，人脸检测、注册和比对全部由后端调用百度云完成：
+
+```powershell
+cd D:\employee_attendance\desktop
+python main.py
+```
+
+无摄像头环境可运行渲染自检：
+
+```powershell
+cd D:\employee_attendance
+python desktop\scripts\build_check.py
+```
